@@ -8,7 +8,6 @@ import {
   Toast,
   getApplications,
   open,
-  confirmAlert,
 } from "@raycast/api";
 import { useState, useEffect } from "react";
 import { search, fetchDetails, fetchStreamUrl } from "./api";
@@ -77,27 +76,27 @@ export default function Command() {
                   target={<MovieDetail id={item.id} title={item.title} isVlcInstalled={isVlcInstalled} />}
                   icon={Icon.Eye}
                 />
-                 {item.type === "movie" ? (
-                   <WatchAction id={item.id} isVlcInstalled={isVlcInstalled} />
-                 ) : (
-                   <Action.Push
-                     title="Select Season"
-                     target={<SeasonSelector id={item.id} title={item.title} isVlcInstalled={isVlcInstalled} />}
-                     icon={Icon.List}
-                   />
-                 )}
-                 <Action.CopyToClipboard
-                   title="Copy Link"
-                   content={`https://meowtv.vercel.app/watch/${item.id}`}
-                 />
-               </ActionPanel>
-             }
-           />
-         ))}
-       </Grid.Section>
-     </Grid>
-   );
- }
+                {item.type === "movie" ? (
+                  <WatchAction id={item.id} isVlcInstalled={isVlcInstalled} />
+                ) : (
+                  <Action.Push
+                    title="Select Episode"
+                    target={<EpisodeSelector id={item.id} title={item.title} isVlcInstalled={isVlcInstalled} />}
+                    icon={Icon.List}
+                  />
+                )}
+                <Action.CopyToClipboard
+                  title="Copy Link"
+                  content={`https://meowtv.vercel.app/watch/${item.id}`}
+                />
+              </ActionPanel>
+            }
+          />
+        ))}
+      </Grid.Section>
+    </Grid>
+  );
+}
 
 function MovieDetail({
   id,
@@ -160,27 +159,20 @@ ${isSeries ? `## Episodes (${details.episodes?.length})\n` + details.episodes?.s
     <Detail
       markdown={markdown}
       navigationTitle={details.title}
-       actions={
-         <ActionPanel>
-           {isSeries ? (
-             <Action.Push
-               title="Select Season"
-               target={
-                 <SeasonSelector
-                   id={id}
-                   title={details.title}
-                   isVlcInstalled={isVlcInstalled}
-                   preloadedEpisodes={details.episodes}
-                 />
-               }
-               icon={Icon.List}
-             />
-           ) : (
-             <WatchAction id={id} isVlcInstalled={isVlcInstalled} />
-           )}
-           <Action.CopyToClipboard title="Copy Page Link" content={`https://meowtv.vercel.app/watch/${id}`} />
-         </ActionPanel>
-       }
+      actions={
+        <ActionPanel>
+          {isSeries ? (
+            <Action.Push
+              title="Select Episode"
+              target={<EpisodeSelector id={id} title={details.title} isVlcInstalled={isVlcInstalled} />}
+              icon={Icon.List}
+            />
+          ) : (
+            <WatchAction id={id} isVlcInstalled={isVlcInstalled} />
+          )}
+          <Action.CopyToClipboard title="Copy Page Link" content={`https://meowtv.vercel.app/watch/${id}`} />
+        </ActionPanel>
+      }
       metadata={
         <Detail.Metadata>
           <Detail.Metadata.Label title="Title" text={details.title} />
@@ -199,183 +191,113 @@ ${isSeries ? `## Episodes (${details.episodes?.length})\n` + details.episodes?.s
   );
 }
 
- function SeasonSelector({
-   id,
-   title,
-   isVlcInstalled,
-   preloadedEpisodes,
- }: {
-   id: string;
-   title: string;
-   isVlcInstalled: boolean;
-   preloadedEpisodes?: Episode[];
- }) {
-   const [episodes, setEpisodes] = useState<Episode[]>(preloadedEpisodes || []);
-   const [isLoading, setIsLoading] = useState(!preloadedEpisodes);
- 
-   useEffect(() => {
-     if (preloadedEpisodes) return;
-     async function loadEpisodes() {
-       try {
-         const details = await fetchDetails(id);
-         if (details) {
-           setEpisodes(details.episodes || []);
-         }
-       } catch (error) {
-         showToast({
-           style: Toast.Style.Failure,
-           title: "Failed to load episodes",
-           message: String(error),
-         });
-       } finally {
-         setIsLoading(false);
-       }
-     }
-     loadEpisodes();
-   }, [id, preloadedEpisodes]);
- 
-   const seasons = [...new Set(episodes.map((ep) => ep.season))].sort((a, b) => a - b);
- 
-   return (
-     <Grid
-       isLoading={isLoading}
-       columns={4}
-       aspectRatio="16/9"
-       fit={Grid.Fit.Fill}
-       navigationTitle={`${title} - Seasons`}
-     >
-       {seasons.map((season) => (
-         <Grid.Item
-           key={season}
-           title={`Season ${season}`}
-           content={Icon.Folder}
-           actions={
-             <ActionPanel>
-               <Action.Push
-                 title="View Episodes"
-                 target={
-                   <EpisodeSelector
-                     id={id}
-                     title={title}
-                     isVlcInstalled={isVlcInstalled}
-                     season={season}
-                     allEpisodes={episodes}
-                   />
-                 }
-                 icon={Icon.List}
-               />
-             </ActionPanel>
-           }
-         />
-       ))}
-     </Grid>
-   );
- }
- 
- function EpisodeSelector({
-   id,
-   title,
-   isVlcInstalled,
-   season,
-   allEpisodes,
- }: {
-   id: string;
-   title: string;
-   isVlcInstalled: boolean;
-   season: number;
-   allEpisodes: Episode[];
- }) {
-   const episodes = allEpisodes.filter((ep) => ep.season === season);
- 
-   return (
-     <Grid columns={4} aspectRatio="16/9" fit={Grid.Fit.Fill} navigationTitle={`${title} - Season ${season}`}>
-       {episodes.map((ep) => (
-         <Grid.Item
-           key={`${ep.season}-${ep.number}`}
-           title={`Episode ${ep.number}`}
-           subtitle={ep.title}
-           content={Icon.Video}
-           actions={
-             <ActionPanel>
-               <WatchAction
-                 id={id}
-                 episodeId={ep.id}
-                 isVlcInstalled={isVlcInstalled}
-                 season={ep.season}
-                 episode={ep.number}
-               />
-               <Action.CopyToClipboard
-                 title="Copy Link"
-                 content={`https://meowtv.vercel.app/watch/${id}?s=${ep.season}&e=${ep.number}`}
-               />
-             </ActionPanel>
-           }
-         />
-       ))}
-     </Grid>
-   );
- }
+function EpisodeSelector({ id, title, isVlcInstalled }: { id: string; title: string; isVlcInstalled: boolean }) {
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
- function WatchAction({
-   id,
-   episodeId,
-   isVlcInstalled,
-   season,
-   episode,
- }: {
-   id: string;
-   episodeId?: string;
-   isVlcInstalled: boolean;
-   season?: number;
-   episode?: number;
- }) {
-   const watchUrl = `https://meowtv.vercel.app/watch/${id}${season ? `?s=${season}${episode ? `&e=${episode}` : ""}` : ""}`;
- 
-   const watchInVlc = async () => {
-     const toast = await showToast({
-       style: Toast.Style.Animated,
-       title: "Fetching stream URL...",
-     });
-     try {
-       const stream = await fetchStreamUrl(id, episodeId);
-       if (stream && stream.videoUrl) {
-         toast.hide();
-         try {
-           await open(stream.videoUrl, "VLC");
-         } catch {
-           await open(stream.videoUrl);
-         }
-       } else {
-         throw new Error("No stream URL found. Try watching on website.");
-       }
-     } catch (error) {
-       toast.style = Toast.Style.Failure;
-       toast.title = "Playback Error";
-       toast.message = String(error);
-     }
-   };
- 
-   return (
-     <Action
-       title="Watch Now"
-       icon={Icon.Play}
-       onAction={async () => {
-         if (isVlcInstalled) {
-           const confirmed = await confirmAlert({
-             title: "Watch on VLC?",
-             message: "Would you like to play this in VLC or open it in your browser?",
-             primaryAction: { title: "VLC Player" },
-             dismissAction: { title: "Web Browser" },
-           });
-           if (confirmed) {
-             await watchInVlc();
-           } else {
-             await open(watchUrl);
-           }
-         } else {
-           await open(watchUrl);
-         }
-       }}
-     />
-   );
- }
+  useEffect(() => {
+    async function loadEpisodes() {
+      try {
+        const details = await fetchDetails(id);
+        if (details) {
+          setEpisodes(details.episodes || []);
+        }
+      } catch (error) {
+        showToast({
+          style: Toast.Style.Failure,
+          title: "Failed to load episodes",
+          message: String(error),
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadEpisodes();
+  }, [id]);
+
+  return (
+    <Grid
+      isLoading={isLoading}
+      columns={4}
+      aspectRatio="16/9"
+      fit={Grid.Fit.Fill}
+      navigationTitle={`${title} - Episodes`}
+    >
+      {episodes.map((ep) => (
+        <Grid.Item
+          key={`${ep.season}-${ep.number}`}
+          title={`S${ep.season} E${ep.number}`}
+          subtitle={ep.title}
+          content={Icon.Video}
+          actions={
+            <ActionPanel>
+              <WatchAction
+                id={id}
+                episodeId={ep.id}
+                isVlcInstalled={isVlcInstalled}
+                season={ep.season}
+                episode={ep.number}
+              />
+              <Action.CopyToClipboard
+                title="Copy Link"
+                content={`https://meowtv.vercel.app/watch/${id}?s=${ep.season}&e=${ep.number}`}
+              />
+            </ActionPanel>
+          }
+        />
+      ))}
+    </Grid>
+  );
+}
+
+function WatchAction({
+  id,
+  episodeId,
+  isVlcInstalled,
+  season,
+  episode,
+}: {
+  id: string;
+  episodeId?: string;
+  isVlcInstalled: boolean;
+  season?: number;
+  episode?: number;
+}) {
+  const watchUrl = `https://meowtv.vercel.app/watch/${id}${season ? `?s=${season}${episode ? `&e=${episode}` : ""}` : ""}`;
+
+  return (
+    <>
+      {isVlcInstalled && (
+        <Action
+          title="Open in VLC"
+          icon={Icon.Play}
+          shortcut={{ modifiers: ["cmd"], key: "enter" }}
+          onAction={async () => {
+            const toast = await showToast({
+              style: Toast.Style.Animated,
+              title: "Fetching stream URL...",
+            });
+            try {
+              const stream = await fetchStreamUrl(id, episodeId);
+              if (stream && stream.videoUrl) {
+                toast.hide();
+                try {
+                  await open(stream.videoUrl, "VLC");
+                } catch {
+                  await open(stream.videoUrl);
+                }
+              } else {
+                throw new Error("No stream URL found. Try watching on website.");
+              }
+            } catch (error) {
+              toast.style = Toast.Style.Failure;
+              toast.title = "Playback Error";
+              toast.message = String(error);
+            }
+          }}
+        />
+      )}
+      <Action.OpenInBrowser title="Watch on MeowTV" url={watchUrl} />
+    </>
+  );
+}

@@ -148,7 +148,6 @@ export async function fetchDetails(id: string): Promise<MovieDetails | null> {
 interface VideoResponseData {
   data: {
     videoUrl?: string;
-    playUrl?: string;
     subtitles?: Array<{
       abbreviate?: string;
       title?: string;
@@ -161,24 +160,24 @@ export async function fetchStreamUrl(
   movieId: string,
   episodeId?: string,
 ): Promise<VideoResponse | null> {
-  const { key, cookie } = await getSecurityKey();
+  const { key } = await getSecurityKey();
   if (!key) return null;
 
-  // Try using clientType 2 (iOS) which often has simpler requirements
-  const url = `${MAIN_URL}/film-api/v2.1.2/movie/getVideo2?clientType=2&packageName=com.external.castle&channel=IndiaA&lang=en-US`;
+  // Castle API resolves quality 2 (720p) as a good default
+  const url = `${MAIN_URL}/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US`;
 
   const body = {
     mode: "1",
-    clientType: "2",
-    resolution: "", // auto
-    packageName: "com.external.castle",
+    appMarket: "GuanWang",
+    clientType: "1",
+    woolUser: "false",
     apkSignKey: "ED0955EB04E67A1D9F3305B95454FED485261475",
+    androidVersion: "13",
     movieId,
     episodeId: episodeId || movieId,
     isNewUser: "true",
-    appMarket: "GuanWang",
-    woolUser: "false",
-    deviceId: "6a89c8a3-936d-491a-b615-5d9c2401f8c0",
+    resolution: "3", // Higher resolution if possible
+    packageName: "com.external.castle",
   };
 
   try {
@@ -187,7 +186,7 @@ export async function fetchStreamUrl(
       headers: {
         "Content-Type": "application/json; charset=utf-8",
         "User-Agent": "okhttp/4.9.0",
-        Cookie: `hd=on${cookie ? `; ${cookie}` : ""}`,
+        Cookie: "hd=on",
       },
       body: JSON.stringify(body),
     });
@@ -198,10 +197,9 @@ export async function fetchStreamUrl(
 
     const data =
       parseJsonPreserveBigInt<VideoResponseData>(decryptedJson).data;
-    const videoUrl = data?.videoUrl || data?.playUrl;
-    if (data && videoUrl) {
+    if (data && data.videoUrl) {
       return {
-        videoUrl: videoUrl,
+        videoUrl: data.videoUrl,
         subtitles: (data.subtitles || [])
           .map((s) => ({
             language: s.abbreviate || s.title || "Unknown",
