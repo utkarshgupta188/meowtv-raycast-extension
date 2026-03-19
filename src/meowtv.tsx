@@ -6,27 +6,15 @@ import {
   Detail,
   showToast,
   Toast,
-  getApplications,
-  open,
 } from "@raycast/api";
 import { useState, useEffect } from "react";
-import { search, fetchDetails, fetchStreamUrl } from "./api";
+import { search, fetchDetails } from "./api";
 import { ContentItem, MovieDetails, Episode } from "./types";
 
 export default function Command() {
   const [searchText, setSearchText] = useState("");
   const [results, setResults] = useState<ContentItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isVlcInstalled, setIsVlcInstalled] = useState(false);
-
-  useEffect(() => {
-    async function checkVlc() {
-      const apps = await getApplications();
-      setIsVlcInstalled(apps.some((app) => app.name.toLowerCase().includes("vlc")));
-    }
-    checkVlc();
-  }, []);
-
   useEffect(() => {
     async function performSearch() {
       if (!searchText) {
@@ -73,15 +61,15 @@ export default function Command() {
               <ActionPanel>
                 <Action.Push
                   title="View Details"
-                  target={<MovieDetail id={item.id} title={item.title} isVlcInstalled={isVlcInstalled} />}
+                  target={<MovieDetail id={item.id} title={item.title} />}
                   icon={Icon.Eye}
                 />
                 {item.type === "movie" ? (
-                  <WatchAction id={item.id} isVlcInstalled={isVlcInstalled} />
+                  <WatchAction id={item.id} />
                 ) : (
                   <Action.Push
                     title="Select Episode"
-                    target={<EpisodeSelector id={item.id} title={item.title} isVlcInstalled={isVlcInstalled} />}
+                    target={<EpisodeSelector id={item.id} title={item.title} />}
                     icon={Icon.List}
                   />
                 )}
@@ -101,11 +89,9 @@ export default function Command() {
 function MovieDetail({
   id,
   title,
-  isVlcInstalled,
 }: {
   id: string;
   title: string;
-  isVlcInstalled: boolean;
 }) {
   const [details, setDetails] = useState<MovieDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -164,11 +150,11 @@ ${isSeries ? `## Episodes (${details.episodes?.length})\n` + details.episodes?.s
           {isSeries ? (
             <Action.Push
               title="Select Episode"
-              target={<EpisodeSelector id={id} title={details.title} isVlcInstalled={isVlcInstalled} />}
+              target={<EpisodeSelector id={id} title={details.title} />}
               icon={Icon.List}
             />
           ) : (
-            <WatchAction id={id} isVlcInstalled={isVlcInstalled} />
+            <WatchAction id={id} />
           )}
           <Action.CopyToClipboard title="Copy Page Link" content={`https://meowtv.vercel.app/watch/${id}`} />
         </ActionPanel>
@@ -191,7 +177,7 @@ ${isSeries ? `## Episodes (${details.episodes?.length})\n` + details.episodes?.s
   );
 }
 
-function EpisodeSelector({ id, title, isVlcInstalled }: { id: string; title: string; isVlcInstalled: boolean }) {
+function EpisodeSelector({ id, title }: { id: string; title: string }) {
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -233,8 +219,6 @@ function EpisodeSelector({ id, title, isVlcInstalled }: { id: string; title: str
             <ActionPanel>
               <WatchAction
                 id={id}
-                episodeId={ep.id}
-                isVlcInstalled={isVlcInstalled}
                 season={ep.season}
                 episode={ep.number}
               />
@@ -252,52 +236,16 @@ function EpisodeSelector({ id, title, isVlcInstalled }: { id: string; title: str
 
 function WatchAction({
   id,
-  episodeId,
-  isVlcInstalled,
   season,
   episode,
 }: {
   id: string;
-  episodeId?: string;
-  isVlcInstalled: boolean;
   season?: number;
   episode?: number;
 }) {
   const watchUrl = `https://meowtv.vercel.app/watch/${id}${season ? `?s=${season}${episode ? `&e=${episode}` : ""}` : ""}`;
 
   return (
-    <>
-      {isVlcInstalled && (
-        <Action
-          title="Open in VLC"
-          icon={Icon.Play}
-          shortcut={{ modifiers: ["cmd"], key: "enter" }}
-          onAction={async () => {
-            const toast = await showToast({
-              style: Toast.Style.Animated,
-              title: "Fetching stream URL...",
-            });
-            try {
-              const stream = await fetchStreamUrl(id, episodeId);
-              if (stream && stream.videoUrl) {
-                toast.hide();
-                try {
-                  await open(stream.videoUrl, "VLC");
-                } catch {
-                  await open(stream.videoUrl);
-                }
-              } else {
-                throw new Error("No stream URL found. Try watching on website.");
-              }
-            } catch (error) {
-              toast.style = Toast.Style.Failure;
-              toast.title = "Playback Error";
-              toast.message = String(error);
-            }
-          }}
-        />
-      )}
-      <Action.OpenInBrowser title="Watch on MeowTV" url={watchUrl} />
-    </>
+    <Action.OpenInBrowser title="Watch on MeowTV" url={watchUrl} />
   );
 }
