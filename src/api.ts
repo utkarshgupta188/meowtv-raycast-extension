@@ -148,6 +148,7 @@ export async function fetchDetails(id: string): Promise<MovieDetails | null> {
 interface VideoResponseData {
   data: {
     videoUrl?: string;
+    playUrl?: string;
     subtitles?: Array<{
       abbreviate?: string;
       title?: string;
@@ -158,26 +159,26 @@ interface VideoResponseData {
 
 export async function fetchStreamUrl(
   movieId: string,
-  episodeId: string,
+  episodeId?: string,
 ): Promise<VideoResponse | null> {
-  const { key } = await getSecurityKey();
+  const { key, cookie } = await getSecurityKey();
   if (!key) return null;
 
-  // Castle API resolves quality 2 (720p) as a good default
-  const url = `${MAIN_URL}/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US`;
+  // Try using clientType 2 (iOS) which often has simpler requirements
+  const url = `${MAIN_URL}/film-api/v2.1.2/movie/getVideo2?clientType=2&packageName=com.external.castle&channel=IndiaA&lang=en-US`;
 
   const body = {
     mode: "1",
-    appMarket: "GuanWang",
-    clientType: "1",
-    woolUser: "false",
-    apkSignKey: "ED0955EB04E67A1D9F3305B95454FED485261475",
-    androidVersion: "13",
-    movieId,
-    episodeId,
-    isNewUser: "true",
-    resolution: "2",
+    clientType: "2",
+    resolution: "", // auto
     packageName: "com.external.castle",
+    apkSignKey: "ED0955EB04E67A1D9F3305B95454FED485261475",
+    movieId,
+    episodeId: episodeId || movieId,
+    isNewUser: "true",
+    appMarket: "GuanWang",
+    woolUser: "false",
+    deviceId: "6a89c8a3-936d-491a-b615-5d9c2401f8c0",
   };
 
   try {
@@ -186,7 +187,7 @@ export async function fetchStreamUrl(
       headers: {
         "Content-Type": "application/json; charset=utf-8",
         "User-Agent": "okhttp/4.9.0",
-        Cookie: "hd=on",
+        Cookie: `hd=on${cookie ? `; ${cookie}` : ""}`,
       },
       body: JSON.stringify(body),
     });
@@ -197,9 +198,10 @@ export async function fetchStreamUrl(
 
     const data =
       parseJsonPreserveBigInt<VideoResponseData>(decryptedJson).data;
-    if (data && data.videoUrl) {
+    const videoUrl = data?.videoUrl || data?.playUrl;
+    if (data && videoUrl) {
       return {
-        videoUrl: data.videoUrl,
+        videoUrl: videoUrl,
         subtitles: (data.subtitles || [])
           .map((s) => ({
             language: s.abbreviate || s.title || "Unknown",
